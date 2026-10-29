@@ -9,7 +9,9 @@ import type { Score } from "../ai/stockfishClient";
  * White's share is drawn from the bottom, matching the usual convention.
  */
 export const EvalBar = memo(function EvalBar({ score, depth }: { score: Score | null; depth: number }) {
-  const pct = score ? winPct(score) : 50;
+  // No score yet means "not analysed", not "equal": a 50% fill would read as
+  // an evaluation before Stockfish has run, so the empty bar stays unfilled.
+  const pct = score ? winPct(score) : 0;
   return (
     <div className="flex flex-col items-center gap-1" aria-label="Đánh giá vị trí">
       <span className="mc-display text-[0.55rem] tracking-[0.18em] text-[#c8ab74]">ĐEN</span>

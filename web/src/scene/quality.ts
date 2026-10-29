@@ -79,7 +79,10 @@ export const QUALITY_SETTINGS: Record<QualityPreset, QualitySettings> = {
     lightShafts: true,
     dustCount: 220,
     emberCount: 60,
-    maxPixelRatio: 1.5,
+    // Capped at 1: the composer runs 4-6 fullscreen passes, so every step of
+    // pixel ratio multiplies fragment cost by ratio^2. 1.5x cost 2.25x the
+    // pixels for a sharpness gain most phones cannot show.
+    maxPixelRatio: 1,
     captureParticles: 34,
     idleAnimations: true,
     troopCount: 140,
@@ -102,7 +105,9 @@ export const QUALITY_SETTINGS: Record<QualityPreset, QualitySettings> = {
     lightShafts: true,
     dustCount: 520,
     emberCount: 120,
-    maxPixelRatio: 2,
+    // 2x cost 4x the pixels through the composer; 1.5x (2.25x) keeps the
+    // high-preset look while cutting fragment work by roughly 44%.
+    maxPixelRatio: 1.5,
     captureParticles: 60,
     idleAnimations: true,
     troopCount: 240,

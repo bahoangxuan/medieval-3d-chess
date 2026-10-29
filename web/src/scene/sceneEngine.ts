@@ -1079,6 +1079,7 @@ export class SceneEngine {
 
   private fpsSamples: number[] = [];
   private autoAdjusted = false;
+  private lastAutoAdjustAt = -100;
   private lastFpsReport = 0;
 
   constructor(
@@ -1461,8 +1462,13 @@ export class SceneEngine {
     const average = this.fpsSamples.reduce((sum, value) => sum + value, 0) / this.fpsSamples.length;
     this.callbacks.onFps(Math.round(average));
 
-    // One automatic step down if the detected preset is clearly too heavy.
-    if (this.autoAdjusted || this.elapsed < 8 || this.fpsSamples.length < 100) return;
+    // Automatic step-downs while the detected preset is clearly too heavy.
+    // Previously this fired once and then never again, so a device that was
+    // still slow after one step got no further help. Now it may step down
+    // again, but at most once per 8s and only on fresh samples, so a single
+    // hitch cannot cascade the game down to Low.
+    if (this.elapsed < 8 || this.fpsSamples.length < 100) return;
+    if (this.elapsed - this.lastAutoAdjustAt < 8) return;
     if (average >= 40) return;
     const order: QualityPreset[] = ["low", "medium", "high", "ultra"];
     const index = order.indexOf(this.preset);
@@ -1470,7 +1476,8 @@ export class SceneEngine {
       this.autoAdjusted = true;
       return;
     }
-    this.autoAdjusted = true;
+    this.lastAutoAdjustAt = this.elapsed;
+    this.fpsSamples = [];
     const next = order[index - 1];
     this.setQuality(next);
     this.callbacks.onQualityAdjusted(next);
@@ -1511,6 +1518,11 @@ export class SceneEngine {
       this.scene.add(view.container);
       this.pieces.set(entry.square, view);
     }
+    // A rebuild used to wipe last-move/check highlights (and leave a stale
+    // preview flag) until the next move; restore the ambient markers here
+    // the same way resync() does after undo.
+    this.previewing = false;
+    this.restoreBaseHighlights();
   }
 
   private trayPosition(color: Faction, index: number): THREE.Vector3 {

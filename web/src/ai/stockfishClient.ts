@@ -47,6 +47,10 @@ export interface AnalyzeOptions {
 export function parseUciInfoLine(line: string): PvLine | null {
   if (!line.startsWith("info ")) return null;
   const tokens = line.split(/\s+/);
+  // Bound lines are not exact scores: "score cp 31 upperbound" is a ceiling,
+  // not the position's evaluation. Accepting one at final depth would display
+  // a bound as if it were the true score, so skip them outright.
+  if (tokens.includes("upperbound") || tokens.includes("lowerbound")) return null;
   const at = (key: string): string | null => {
     const i = tokens.indexOf(key);
     return i >= 0 && i + 1 < tokens.length ? tokens[i + 1] : null;
@@ -96,6 +100,22 @@ export class StockfishClient {
   private pending: Pending | null = null;
   private nextId = 1;
   private failed = false;
+  /**
+   * Monotonic search sequence. analyze() claims a sequence number before
+   * awaiting the uci handshake; a caller that started later makes earlier
+   * claimants stale, so a superseded analyze() resolves null instead of
+   * racing to set `pending` and hanging forever.
+   */
+  private latestSeq = 0;
+  /**
+   * True when a cancelled search's `bestmove` is still on its way. The worker
+   * answers `stop` with a bestmove before it processes the next `position/go`,
+   * but the JS side already replaced `pending` — without this flag that stale
+   * bestmove would resolve the *new* analysis with the old move. The flag is
+   * consumed by exactly one bestmove line, and cleared whenever the worker is
+   * replaced, so a lost bestmove cannot suppress a later real one forever.
+   */
+  private staleBestmoveExpected = false;
 
   /** True once the worker has answered `uciok`, or after a hard failure. */
   get hasFailed(): boolean {
@@ -104,6 +124,8 @@ export class StockfishClient {
 
   private ensureWorker(): Worker {
     if (this.worker) return this.worker;
+    // A fresh worker cannot emit a stale bestmove from a previous one.
+    this.staleBestmoveExpected = false;
     const worker = new Worker(stockfishWorkerUrl());
     worker.onmessage = (event: MessageEvent<string>) => {
       const line = typeof event.data === "string" ? event.data : "";
@@ -112,6 +134,13 @@ export class StockfishClient {
       if (line.startsWith("uciok")) return;
       const best = parseBestmoveLine(line);
       if (best !== null || line.startsWith("bestmove")) {
+        if (this.staleBestmoveExpected) {
+          // The cancelled search's answer, arriving after the new search
+          // already claimed `pending`. Drop it; the new search's own
+          // bestmove will arrive later and resolve normally.
+          this.staleBestmoveExpected = false;
+          return;
+        }
         const result: AnalysisResult = {
           fen: pending.fen,
           depth: pending.depth,
@@ -165,6 +194,10 @@ export class StockfishClient {
       } catch {
         // Worker already gone — the pending promise is resolved below anyway.
       }
+      // The stopped search's bestmove is still queued behind `stop`; it must
+      // not resolve whatever analysis starts next (see staleBestmoveExpected).
+      this.staleBestmoveExpected = true;
+      this.latestSeq += 1;
       this.clearPending();
       pending.resolve(null);
     }
@@ -175,6 +208,8 @@ export class StockfishClient {
     const multiPv = Math.max(1, Math.min(5, options.multiPv ?? 3));
     const timeoutMs = options.timeoutMs ?? 15000;
     this.cancel();
+    const mySeq = this.latestSeq + 1;
+    this.latestSeq = mySeq;
     let worker: Worker;
     try {
       worker = this.ensureWorker();
@@ -183,6 +218,10 @@ export class StockfishClient {
       return null;
     }
     if (this.ready) await this.ready;
+    // A newer analyze() started while this one awaited the handshake: this
+    // caller is superseded and must resolve immediately, not race to claim
+    // `pending` and hang until its timeout.
+    if (mySeq !== this.latestSeq) return null;
     if (this.failed) return null;
     const id = this.nextId++;
     return new Promise<AnalysisResult | null>((resolve) => {
@@ -213,6 +252,8 @@ export class StockfishClient {
 
   dispose(): void {
     this.cancel();
+    // The worker is gone, so no stale bestmove can arrive for it.
+    this.staleBestmoveExpected = false;
     this.worker?.terminate();
     this.worker = null;
     this.ready = null;

@@ -683,19 +683,22 @@ export function GameShell() {
           />
         ) : null}
 
-        {phase === "playing" && !cinema ? (
-          <CoachPanel
-            fen={snapshot.fen}
-            moves={snapshot.moves}
-            turn={snapshot.turn}
-            canHint={
-              snapshot.status === "playing" &&
-              !snapshot.thinking &&
-              !snapshot.busy &&
-              (snapshot.mode !== "ai" || snapshot.turn === snapshot.playerColor)
-            }
-            onPreviewMove={handlePreviewMove}
-          />
+        {phase === "playing" ? (
+          <div className={cinema ? "hidden" : undefined}>
+            <CoachPanel
+              fen={snapshot.fen}
+              moves={snapshot.moves}
+              turn={snapshot.turn}
+              canHint={
+                snapshot.status === "playing" &&
+                !snapshot.thinking &&
+                !snapshot.busy &&
+                (snapshot.mode !== "ai" || snapshot.turn === snapshot.playerColor)
+              }
+              canGrade={!snapshot.thinking && !snapshot.busy}
+              onPreviewMove={handlePreviewMove}
+            />
+          </div>
         ) : null}
 
         {phase === "playing" && cinema ? (

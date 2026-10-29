@@ -22,6 +22,11 @@ describe("UCI parsing", () => {
     expect(parseBestmoveLine("bestmove e2e4 ponder e7e6")).toBe("e2e4");
     expect(parseBestmoveLine("bestmove (none)")).toBeNull();
   });
+
+  it("ignores upperbound/lowerbound lines, which are not exact scores", () => {
+    expect(parseUciInfoLine("info depth 12 multipv 1 score cp 25 upperbound pv d2d4")).toBeNull();
+    expect(parseUciInfoLine("info depth 12 multipv 1 score cp 25 lowerbound pv d2d4")).toBeNull();
+  });
 });
 
 describe("grading", () => {

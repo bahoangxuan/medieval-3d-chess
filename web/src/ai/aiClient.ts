@@ -67,11 +67,23 @@ export class AiClient {
     });
   }
 
-  /** Drops the current request; a late reply is ignored. */
+  /**
+   * Drops the current request and stops its search. The worker runs its
+   * search synchronously, so a posted "abort" message could only be read
+   * after the search finished — it would never actually stop anything.
+   * Terminating the worker is the only way to reclaim that CPU, and it is
+   * safe: the pending promise is already resolved with null, and the next
+   * search recreates a fresh worker. An idle worker is left alone so a
+   * plain cancel does not pay a worker restart for nothing.
+   */
   cancel(): void {
     const pending = this.pending;
     this.pending = null;
     pending?.resolve(null);
+    if (pending) {
+      this.worker?.terminate();
+      this.worker = null;
+    }
   }
 
   dispose(): void {

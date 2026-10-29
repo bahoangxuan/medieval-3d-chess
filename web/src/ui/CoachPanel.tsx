@@ -16,8 +16,24 @@ interface CoachPanelProps {
   turn: Faction;
   /** False while the opponent is thinking, in a timed game the coach is off, etc. */
   canHint: boolean;
+  /**
+   * False while the opponent is thinking or the board is busy. Grading is
+   * allowed after game over (post-game review) and on the player's turn, but
+   * never while the game engine is mid-search, or Coach + game AI + 3D all
+   * compete for CPU at once.
+   */
+  canGrade: boolean;
   onPreviewMove: (move: LedgerMove | null) => void;
 }
+
+/**
+ * One Stockfish worker for the whole session, shared across CoachPanel
+ * mounts. Previously the worker was terminated on every unmount, so
+ * toggling cinema mode or leaving play forced a ~1.8MB WASM reload plus
+ * the uci handshake before the next hint. The worker is deliberately not
+ * disposed here; the browser reclaims it when the page closes.
+ */
+let sharedClient: StockfishClient | null = null;
 
 interface HintLine {
   rank: number;
@@ -61,7 +77,7 @@ function depthForDevice(): number {
   return typeof window !== "undefined" && window.innerWidth < 768 ? 14 : 16;
 }
 
-export function CoachPanel({ fen, moves, turn, canHint, onPreviewMove }: CoachPanelProps) {
+export function CoachPanel({ fen, moves, turn, canHint, canGrade, onPreviewMove }: CoachPanelProps) {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [statusText, setStatusText] = useState("");
@@ -71,18 +87,32 @@ export function CoachPanel({ fen, moves, turn, canHint, onPreviewMove }: CoachPa
   const [fallbackNote, setFallbackNote] = useState("");
   const [lastExplanation, setLastExplanation] = useState("");
   const [lastLabel, setLastLabel] = useState<MoveLabel | null>(null);
-  const clientRef = useRef<StockfishClient | null>(null);
+  // Tracks the position the panel is currently showing, so a result that
+  // arrives after the board moved on is never displayed as current.
+  const fenRef = useRef(fen);
+  fenRef.current = fen;
 
+  // A new position invalidates every result from the old one: hints, eval
+  // and grading from before the move, undo or rematch must not survive into
+  // the new position, and any board highlight from an old hint is cleared.
+  // This runs on mount too, where it only clears already-empty state.
   useEffect(() => {
-    return () => {
-      clientRef.current?.dispose();
-      clientRef.current = null;
-    };
-  }, []);
+    setHints([]);
+    setEvalScore(null);
+    setEvalDepth(0);
+    setFallbackNote("");
+    setLastExplanation("");
+    setLastLabel(null);
+    setStatus("idle");
+    setStatusText("");
+    onPreviewMove(null);
+    // onPreviewMove is stable (GameShell's useCallback with [] deps).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fen]);
 
   const getClient = useCallback((): StockfishClient => {
-    if (!clientRef.current) clientRef.current = new StockfishClient();
-    return clientRef.current;
+    if (!sharedClient) sharedClient = new StockfishClient();
+    return sharedClient;
   }, []);
 
   const analyze = useCallback(
@@ -93,10 +123,16 @@ export function CoachPanel({ fen, moves, turn, canHint, onPreviewMove }: CoachPa
   );
 
   const handleHint = useCallback(async () => {
+    const requestedFen = fen;
     setStatus("loading");
     setStatusText("Stockfish đang tính…");
     setFallbackNote("");
+    // Old hints are for this same position until the board moves, but once a
+    // new analysis is requested they are replaced, not left on screen under
+    // the loading line as if they were fresh.
+    setHints([]);
     const result = await analyze(fen, 3);
+    if (fenRef.current !== requestedFen) return;
     if (!result || result.lines.length === 0) {
       // Fallback: the game's own engine can still give one usable move.
       // Its score is not a Stockfish eval, so no eval bar is shown for it.
@@ -152,10 +188,14 @@ export function CoachPanel({ fen, moves, turn, canHint, onPreviewMove }: CoachPa
       setStatusText("Không replay được ván để lấy vị trí trước nước đi.");
       return;
     }
+    const requestedFen = fen;
     setStatus("loading");
     setStatusText("Đang chấm nước vừa đi…");
+    setLastExplanation("");
+    setLastLabel(null);
     const before = await analyze(beforeFen, 3);
     const after = await analyze(fen, 1);
+    if (fenRef.current !== requestedFen) return;
     if (!before || before.lines.length === 0 || !after || after.lines.length === 0) {
       setStatus("error");
       setStatusText("Phân tích chưa xong hoặc Stockfish chưa sẵn sàng, bấm lại sau vài giây.");
@@ -267,7 +307,7 @@ export function CoachPanel({ fen, moves, turn, canHint, onPreviewMove }: CoachPa
             </button>
             <button
               type="button"
-              disabled={moves.length === 0 || status === "loading"}
+              disabled={!canGrade || moves.length === 0 || status === "loading"}
               onClick={handleAnalyzeLastMove}
               className="mc-coach-action"
             >
@@ -276,7 +316,13 @@ export function CoachPanel({ fen, moves, turn, canHint, onPreviewMove }: CoachPa
           </div>
           {!canHint ? (
             <p className="mt-2 text-[0.7rem] leading-relaxed text-[#8a7a5c]">
-              Gợi ý chỉ chạy khi tới lượt bạn và máy không đang suy nghĩ.
+              Gợi ý chỉ chạy khi tới lượt bạn và máy không đang suy nghĩ. Đồng hồ vẫn chạy trong lúc
+              Coach tính, nên đừng bấm Coach khi đang cạn giờ.
+            </p>
+          ) : null}
+          {!canGrade && moves.length > 0 ? (
+            <p className="mt-2 text-[0.7rem] leading-relaxed text-[#8a7a5c]">
+              Chấm nước chờ máy nghĩ xong rồi mới chạy, để khỏi tranh CPU với ván đang đánh.
             </p>
           ) : null}
           {status === "loading" ? <p className="mt-2 text-xs text-[#c8ab74]">{statusText}</p> : null}
@@ -288,8 +334,9 @@ export function CoachPanel({ fen, moves, turn, canHint, onPreviewMove }: CoachPa
                 <li key={hint.rank}>
                   <button
                     type="button"
+                    disabled={status === "loading"}
                     onClick={() => onPreviewMove({ from: hint.from, to: hint.to } as LedgerMove)}
-                    className="w-full rounded-sm border border-[#8a652233] px-2 py-1.5 text-left hover:border-[#c8ab74]"
+                    className="w-full rounded-sm border border-[#8a652233] px-2 py-1.5 text-left hover:border-[#c8ab74] disabled:opacity-40"
                     title="Bấm để sáng ô gợi ý trên bàn"
                   >
                     <span className="text-xs font-semibold text-[#f0dfb6]">

@@ -81,8 +81,8 @@ const PREMOVE_DEPTHS: { count: number; label: string; note: string }[] = [
 
 const PRESETS: { key: QualityPreset; label: string; note: string }[] = [
   { key: "low", label: "Low", note: "No post-processing, no shadows — runs anywhere" },
-  { key: "medium", label: "Medium", note: "Bloom, shadows, light shafts, some dust" },
-  { key: "high", label: "High", note: "Adds depth of field, grade, 2K shadows" },
+  { key: "medium", label: "Medium", note: "Bloom, grade, SMAA, shadows, light shafts, some dust" },
+  { key: "high", label: "High", note: "Adds 2K shadows, denser particles (depth of field only in cinematics)" },
   { key: "ultra", label: "Ultra", note: "Ambient occlusion, 4K shadows, dense particles" },
 ];
 
@@ -98,7 +98,7 @@ export function SettingsPanel({
   /** A phone has no `F` to press, so the note names the button instead. */
   const hasKeyboard = useHasKeyboard();
   return (
-    <div className="mc-modal-pad pointer-events-auto absolute inset-0 z-20 flex flex-col items-center justify-center overflow-hidden bg-black/60 backdrop-blur-sm">
+    <div className="mc-modal-pad pointer-events-auto absolute inset-0 z-40 flex flex-col items-center justify-center overflow-hidden bg-black/60 backdrop-blur-sm">
       <div className="mc-slate mc-goldleaf mc-rise flex max-h-full w-full min-h-0 max-w-lg flex-col p-5 sm:p-6">
         <div className="mb-4 flex shrink-0 items-center justify-between">
           <h2 className="mc-display text-lg text-[#f2e2bd]">Settings</h2>

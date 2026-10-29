@@ -67,7 +67,10 @@ interface ControllerEvents {
   premovefailed: { from: SquareId; to: SquareId; dropped: number; reason: "illegal" | "check" };
 }
 
-const CLOCK_TICK_MS = 100;
+// 250ms: the clock display only shows whole seconds and tickClock() deducts
+// the real elapsed delta, so timekeeping stays exact while the overlay tree
+// re-renders 4x/second instead of 10x/second on top of the 3D loop.
+const CLOCK_TICK_MS = 250;
 
 /**
  * Floor on how long a reply against the computer takes, in ms.

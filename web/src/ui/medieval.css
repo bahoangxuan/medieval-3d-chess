@@ -917,6 +917,52 @@
   border-color: rgba(246, 223, 165, 0.85);
 }
 
+/* ------------------------------------------------------- coach panel */
+
+/*
+ * Text actions in the Coach panel. These must NOT reuse .mc-ledger-tool:
+ * that class is a fixed 1.4rem square for icon buttons in the move ledger,
+ * so a text label inside it wraps word-by-word and overflows its fixed
+ * height onto the hint list below (the overlap seen in the first Vercel
+ * preview). Coach actions size to their label and never wrap.
+ */
+.mc-coach-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  padding: 0.4rem 0.75rem;
+  border-radius: 2px;
+  border: 1px solid rgba(216, 177, 99, 0.28);
+  background: rgba(20, 18, 15, 0.6);
+  color: #cbb68d;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 140ms cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+.mc-coach-action:hover:not(:disabled) {
+  color: #fff3d8;
+  border-color: rgba(246, 223, 165, 0.75);
+  transform: translateY(-1px);
+}
+
+.mc-coach-action:active:not(:disabled) {
+  transform: translateY(1px) scale(0.94);
+}
+
+.mc-coach-action:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .mc-ledger-row {
   display: grid;
   grid-template-columns: 1.6rem 1fr 1fr;

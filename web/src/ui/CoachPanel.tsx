@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Chess } from "chess.js";
 import { Lightbulb, X } from "lucide-react";
 
-import { classifyMove, explainMove, flipScore, formatScoreWhite, toWhiteScore, type MoveLabel } from "../ai/analysis";
+import { classifyMove, explainMove, flipScore, formatScoreWhite, MOVE_LABEL_VI, toWhiteScore, type MoveLabel } from "../ai/analysis";
 import { AiClient } from "../ai/aiClient";
 import { fetchOpening, fetchTablebase } from "../ai/lichess";
 import { StockfishClient, type AnalysisResult, type Score } from "../ai/stockfishClient";
@@ -252,14 +252,16 @@ export function CoachPanel({ fen, moves, turn, canHint, onPreviewMove }: CoachPa
         </button>
       </div>
       <div className="flex min-h-0 flex-1 gap-3 overflow-y-auto p-3">
-        <EvalBar score={evalScore} depth={evalDepth} />
+        <div className="shrink-0">
+          <EvalBar score={evalScore} depth={evalDepth} />
+        </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               disabled={!canHint || status === "loading"}
               onClick={handleHint}
-              className="mc-ledger-tool px-3 py-1.5 text-xs disabled:opacity-40"
+              className="mc-coach-action"
             >
               Gợi ý top 3
             </button>
@@ -267,7 +269,7 @@ export function CoachPanel({ fen, moves, turn, canHint, onPreviewMove }: CoachPa
               type="button"
               disabled={moves.length === 0 || status === "loading"}
               onClick={handleAnalyzeLastMove}
-              className="mc-ledger-tool px-3 py-1.5 text-xs disabled:opacity-40"
+              className="mc-coach-action"
             >
               Chấm nước vừa đi
             </button>
@@ -305,7 +307,7 @@ export function CoachPanel({ fen, moves, turn, canHint, onPreviewMove }: CoachPa
           {lastExplanation ? (
             <div className="mt-3 border-t border-[#8a652233] pt-2">
               <p className="text-[0.6rem] tracking-[0.2em] text-[#a89268]">
-                NƯỚC VỪA ĐI{lastLabel ? ` · ${lastLabel}` : ""}
+                NƯỚC VỪA ĐI{lastLabel ? ` · ${MOVE_LABEL_VI[lastLabel]}` : ""}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-[#e4d3ac]">{lastExplanation}</p>
             </div>

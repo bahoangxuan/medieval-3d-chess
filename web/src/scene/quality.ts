@@ -174,8 +174,16 @@ export function detectQualityPreset(): QualityPreset {
 
   const weakGpu = /(swiftshader|llvmpipe|software|mali-4|adreno \(tm\) [345]|intel.*hd graphics [2-4])/.test(renderer);
   const strongGpu = /(rtx|radeon rx|apple m[1-9]|geforce gtx 1[06-9]|arc a)/.test(renderer);
+  // Intel integrated graphics that is not Arc (UHD/HD/Iris): a desktop with
+  // one of these and 6+ cores used to land on "high" — an iGPU cannot hold
+  // that. Seen in the wild: "Intel(R) UHD Graphics 630" auto-detected as
+  // high and stuck at 20 FPS. Cap the first guess at medium; the FPS
+  // watchdog steps down to low within seconds if the device cannot hold it.
+  const integratedIntel =
+    /intel/.test(renderer) && !/arc/.test(renderer) && /(uhd graphics|hd graphics|iris)/.test(renderer);
 
   if (weakGpu || cores <= 2 || memory <= 2) return "low";
+  if (integratedIntel) return isTouch ? "low" : "medium";
   // A current phone holds `medium` comfortably, and the frame-rate watchdog
   // below steps it back down if this one cannot.
   if (isTouch) return cores >= 4 && memory >= 3 ? "medium" : "low";

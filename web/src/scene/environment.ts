@@ -377,6 +377,11 @@ export class CastleHall {
       this.keyLight.shadow.map = null;
     }
     for (const shaft of this.shafts) shaft.visible = settings.lightShafts;
+    // Low drops the four torch point lights. Every MeshStandardMaterial
+    // fragment iterates all live lights, so on a weak iGPU these four alone
+    // are a large share of the frame cost; the key/fill/hemi lights keep the
+    // hall readable and the (unlit) flames still render.
+    for (const torch of this.torches) torch.light.visible = preset !== "low";
     this.buildParticles(settings.dustCount, settings.emberCount);
   }
 
@@ -435,7 +440,9 @@ export class CastleHall {
       // Layered sines approximate flame noise without a texture lookup.
       const t = this.elapsed * 6 + torch.seed;
       const flicker = 0.72 + Math.sin(t) * 0.12 + Math.sin(t * 2.37) * 0.09 + Math.sin(t * 5.11) * 0.06;
-      torch.light.intensity = torch.base * flicker * torchScale;
+      // On low the torch lights are switched off (see applyQuality); the
+      // flames themselves are unlit meshes and keep flickering.
+      if (torch.light.visible) torch.light.intensity = torch.base * flicker * torchScale;
       const scale = 0.9 + flicker * 0.28;
       torch.flame.scale.set(scale, scale * 1.65, scale);
     }

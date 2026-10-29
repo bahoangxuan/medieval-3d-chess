@@ -14,6 +14,7 @@ import { Clapperboard } from "lucide-react";
 import { ARENA_LOOKS, DEFAULT_ARENA } from "../scene/arena";
 import { detectQualityPreset, type QualityPreset } from "../scene/quality";
 import { SceneEngine, type CameraPreset, type ShowcaseCamera } from "../scene/sceneEngine";
+import { CoachPanel } from "./CoachPanel";
 import { GameOverModal } from "./GameOverModal";
 import { Hud } from "./Hud";
 import { useHasKeyboard } from "./inputMode";
@@ -679,6 +680,21 @@ export function GameShell() {
             onShowcaseCamera={handleShowcaseCamera}
             onToggleCinema={() => setCinema(true)}
             getElapsed={getElapsed}
+          />
+        ) : null}
+
+        {phase === "playing" && !cinema ? (
+          <CoachPanel
+            fen={snapshot.fen}
+            moves={snapshot.moves}
+            turn={snapshot.turn}
+            canHint={
+              snapshot.status === "playing" &&
+              !snapshot.thinking &&
+              !snapshot.busy &&
+              (snapshot.mode !== "ai" || snapshot.turn === snapshot.playerColor)
+            }
+            onPreviewMove={handlePreviewMove}
           />
         ) : null}
 

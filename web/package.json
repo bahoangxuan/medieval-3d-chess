@@ -12,7 +12,9 @@
     "test": "vitest run && vitest run --config vitest.browser.config.ts",
     "test:browser": "vitest --config vitest.browser.config.ts",
     "test:browser:run": "vitest run --config vitest.browser.config.ts",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "predev": "node scripts/copy-stockfish.mjs",
+    "prebuild": "node scripts/copy-stockfish.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -61,6 +63,7 @@
     "react-router-dom": "^6.30.1",
     "recharts": "^2.15.4",
     "sonner": "^2.0.7",
+    "stockfish": "19.0.1",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.185.1",

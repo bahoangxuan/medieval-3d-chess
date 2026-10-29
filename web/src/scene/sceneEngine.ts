@@ -1652,28 +1652,61 @@ export class SceneEngine {
     }
 
     if (event.promotion) {
+      // Promotion ceremony (replaces the old scale-pop): the pawn dissolves
+      // in faction light, then the new champion descends onto the square
+      // instead of simply scaling up in place. Rank sets the ceremony's
+      // weight: a queen gets the full beat, a knight gets a short one, so a
+      // tactical underpromotion still reads quickly. In tactical view the
+      // camera work and descent are skipped so the board stays readable.
+      const quality = QUALITY_SETTINGS[this.preset];
+      const particleBudget =
+        event.promotion === "q"
+          ? Math.round(quality.captureParticles * 0.9)
+          : event.promotion === "n"
+            ? Math.round(quality.captureParticles * 0.5)
+            : Math.round(quality.captureParticles * 0.7);
+      const ceremonySeconds = this.tactical ? 0.5 : event.promotion === "q" ? 0.95 : event.promotion === "n" ? 0.55 : 0.75;
+      if (!this.tactical) this.focusPiece(piece, 0.9);
+      this.effects.spawnBurst(piece.container.position.clone().setY(0.4), FACTION_ACCENT[event.color], Math.max(12, particleBudget), {
+        speed: 2.2,
+        life: 0.7,
+      });
+      this.effects.spawnFlash(to.clone().setY(0.6), 2.4, 0.4);
+      if (!this.tactical) await wait(0.3);
+      if (this.isStale(revision)) return;
       piece.dispose();
       this.pieces.delete(event.to);
       const view = this.factory.create(event.promotion, event.color, {
-        contactShadows: QUALITY_SETTINGS[this.preset].contactShadows,
-        idleAnimation: QUALITY_SETTINGS[this.preset].idleAnimations,
+        contactShadows: quality.contactShadows,
+        idleAnimation: quality.idleAnimations,
         rankBadge: this.rankBadges,
       });
       if (this.tactical) view.setFlat(true);
       view.container.position.copy(to);
+      if (!this.tactical) this.focusPiece(view, 0.9);
+      const baseY = to.y;
+      if (!this.tactical) view.container.position.y = baseY + 1.2;
       view.container.scale.setScalar(0.01);
       this.scene.add(view.container);
       this.pieces.set(event.to, view);
-      this.effects.spawnBurst(to.clone().setY(0.4), FACTION_ACCENT[event.color], 40, { speed: 2.6, life: 0.8 });
-      this.effects.spawnFlash(to.clone().setY(0.6), 2.4, 0.4);
       await this.tweens.to({
-        duration: 0.6,
+        duration: ceremonySeconds,
         easing: Ease.outBack,
-        onUpdate: (t) => view.container.scale.setScalar(Math.max(0.01, t)),
+        onUpdate: (t) => {
+          view.container.scale.setScalar(Math.max(0.01, t));
+          if (!this.tactical) view.container.position.y = Math.max(baseY, baseY + 1.2 * (1 - t));
+        },
       });
       if (this.isStale(revision)) return;
       view.container.scale.setScalar(1);
-      this.landOn(view, event.to, 1.3);
+      view.container.position.y = baseY;
+      this.effects.spawnBurst(to.clone().setY(0.4), FACTION_ACCENT[event.color], Math.max(12, particleBudget), {
+        speed: 2.6,
+        life: 0.8,
+      });
+      this.effects.spawnFlash(to.clone().setY(0.6), 2.4, 0.4);
+      audio.play("place", event.promotion === "q" ? 0.8 : 0.6);
+      this.landOn(view, event.to, event.promotion === "q" ? 1.5 : event.promotion === "n" ? 1.1 : 1.3);
     }
 
     this.board.setHighlight(event.from, "last");
